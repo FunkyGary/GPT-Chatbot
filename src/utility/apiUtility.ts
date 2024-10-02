@@ -1,6 +1,9 @@
 import axios from "axios";
 
 const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY;
+if (!OPENAI_API_KEY) {
+    console.error("REACT_APP_OPENAI_API_KEY is not set in the environment");
+}
 
 const extractFiltersFromQuery = (query: string) => {
     const filters: {
