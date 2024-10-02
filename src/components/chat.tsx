@@ -8,6 +8,8 @@ import {
     List,
     ListItem,
     ListItemText,
+    Card,
+    CardContent,
 } from "@mui/material";
 import { handleUserQuery } from "../utility/apiUtility.ts"; // Import the function for handling the user query
 
@@ -18,30 +20,54 @@ const Chatbot = () => {
     >([]);
     const [input, setInput] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false); // State to manage loading state
+    const [articles, setArticles] = useState<any[]>([]); // State to store the fetched articles
+
     // Function to handle sending the user's query
     const handleSend = async () => {
         if (input.trim()) {
+            // Add the user's message to the conversation
             setMessages((prevMessages) => [
                 ...prevMessages,
                 { sender: "User", text: input },
             ]);
+
+            // Clear the input field
             setInput("");
 
+            // Set loading state to true while the API is processing
             setLoading(true);
 
             try {
-                // Call the function to handle input, ensuring it stays within limits
+                // Call the handleUserQuery function to process the input and get articles and bot response
                 const botResponse = await handleUserQuery(input);
 
+                // Set articles if available
+                setArticles(botResponse.articles || []);
+
+                // Add the bot's response to the conversation
                 setMessages((prevMessages) => [
                     ...prevMessages,
                     {
                         sender: "Bot",
                         text:
-                            botResponse ||
-                            "I couldn’t process your request. Please try again.",
+                            botResponse.summary ||
+                            "I couldn't find any relevant information. Can you please rephrase your question?",
                     },
                 ]);
+
+                // Provide feedback if no articles were found
+                if (
+                    !botResponse.articles ||
+                    botResponse.articles.length === 0
+                ) {
+                    setMessages((prevMessages) => [
+                        ...prevMessages,
+                        {
+                            sender: "Bot",
+                            text: "I couldn't find any articles related to your query. Try asking about a different topic or rephrasing your question.",
+                        },
+                    ]);
+                }
             } catch (error) {
                 setMessages((prevMessages) => [
                     ...prevMessages,
@@ -51,6 +77,7 @@ const Chatbot = () => {
                     },
                 ]);
             } finally {
+                // Set loading state to false once the API request is complete
                 setLoading(false);
             }
         }
@@ -112,6 +139,30 @@ const Chatbot = () => {
             >
                 {loading ? "Processing..." : "Send"}
             </Button>
+
+            {/* Article Cards */}
+            {articles.length > 0 && (
+                <Box sx={{ marginTop: 2 }}>
+                    {articles.map((article, index) => (
+                        <Card key={index} sx={{ marginBottom: 2 }}>
+                            <CardContent>
+                                <Typography variant="h6">
+                                    {article.title}
+                                </Typography>
+                                <Typography variant="body2">
+                                    Published in: {article.publication_year}
+                                </Typography>
+                                <Typography variant="body2">
+                                    Citations: {article.cited_by_count}
+                                </Typography>
+                                <Typography variant="body2">
+                                    Open Access: {article.is_oa ? "Yes" : "No"}
+                                </Typography>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </Box>
+            )}
         </Box>
     );
 };
