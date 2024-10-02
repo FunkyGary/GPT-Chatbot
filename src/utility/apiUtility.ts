@@ -199,10 +199,28 @@ export const handleUserQuery = async (query: string) => {
     if (results.meta.count === 0) {
         return "No articles were found based on your search criteria. Please try adjusting your filters.";
     }
+
+    const filteredArticles = results.results.map((item) => {
+        return {
+            title: item.title,
+            publicationDate: item.publication_date,
+            primaryTopic: item.primary_topic.display_name,
+            keywords: item.keywords.map((keyword) => keyword.display_name),
+            citationCount: item.cited_by_count,
+            citationNormalizedPercentile:
+                item.citation_normalized_percentile.value,
+            fwci: item.fwci,
+        };
+    });
+
     // Format the response using OpenAI
     const openAiPrompt = `Summarize the following search response metadata: ${JSON.stringify(
         results.meta
-    )}. Provide a conversational summary. The example output: I found 5 artificial intelligence research articles published since 2015, each with exactly 100 citations.`;
+    )}. Provide a conversational summary. The example output: I found 5 artificial intelligence research articles published since 2015, each with exactly 100 citations.
+    And then, summarize the following responsed articles: ${JSON.stringify(
+        filteredArticles
+    )}.
+    Provide a conversational summary. The example output: These papers span diverse AI applications including healthcare, climate change, ethics, natural language processing, and finance. Published between 2015 and 2021, with 3 being open access, they represent influential work across various AI domains in recent years.`;
 
     const openAiResponse = await callOpenAI(openAiPrompt);
     return (
