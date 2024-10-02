@@ -223,8 +223,11 @@ export const handleUserQuery = async (query: string) => {
     Provide a conversational summary. The example output: These papers span diverse AI applications including healthcare, climate change, ethics, natural language processing, and finance. Published between 2015 and 2021, with 3 being open access, they represent influential work across various AI domains in recent years.`;
 
     const openAiResponse = await callOpenAI(openAiPrompt);
-    return (
-        openAiResponse ||
-        `I found ${results.meta.count} articles related to your query. Here's the first one: ${results.results[0].title}`
-    );
+
+    return {
+        summary:
+            openAiResponse ||
+            `I found ${results.meta.count} articles related to your query. Here's the first one: ${results.results[0].title}`,
+        articles: filteredArticles,
+    };
 };
