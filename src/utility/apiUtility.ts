@@ -173,7 +173,14 @@ const callOpenAI = async (prompt: string) => {
     }
 };
 
-export const handleUserQuery = async (query: string) => {
+export interface BotResponse {
+    summary: string;
+    articles: any[];
+}
+
+export const handleUserQuery = async (
+    query: string
+): Promise<BotResponse | string> => {
     try {
         const filters = extractFiltersFromQuery(query);
 

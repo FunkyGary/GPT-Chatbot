@@ -15,7 +15,7 @@ This project is an AI-powered chatbot that helps users find and summarize resear
 ### Prerequisites
 
 -   Node.js (version 14 or later)
--   npm (comes with Node.js)
+-   npm (comes with Node.js) or yarn
 -   OpenAI API key
 -   React (version 17 or later)
 
@@ -34,6 +34,12 @@ This project is an AI-powered chatbot that helps users find and summarize resear
     npm install
     ```
 
+    or
+
+    ```
+    yarn
+    ```
+
 3. Create a `.env` file in the root directory and add your OpenAI API key:
     ```
     REACT_APP_OPENAI_API_KEY=your_openai_api_key_here
@@ -42,5 +48,42 @@ This project is an AI-powered chatbot that helps users find and summarize resear
 ### Running the Application
 
 To start the development server:
-docker build --build-arg REACT_APP_OPENAI_API_KEY=your-api-key-here -t your-image-name .
-docker build --build-arg REACT_APP_OPENAI_API_KEY=$(cat .env | grep REACT_APP_OPENAI_API_KEY | cut -d '=' -f2) -t your-image-name .
+
+```
+npm start
+```
+
+or
+
+```
+yarn start
+```
+
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser. The page will reload when you make changes.
+
+### Docker Deployment
+
+To build and run the application using Docker:
+
+1. Build the Docker image:
+
+    ```
+    docker build -t chatbot-app .
+    ```
+
+2. Run the Docker container:
+    ```
+    docker run -p 3000:80 chatbot-app
+    ```
+
+To include environment variables during the build process:
+
+```
+docker build --build-arg REACT_APP_OPENAI_API_KEY=your-api-key-here -t chatbot-app .
+```
+
+## Available Scripts
+
+-   `npm test`: Launches the test runner in interactive watch mode.
+-   `npm run build`: Builds the app for production to the `build` folder.
+-   `npm run eject`: Removes the single build dependency from your project (one-way operation).
