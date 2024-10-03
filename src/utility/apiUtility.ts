@@ -5,15 +5,17 @@ if (!OPENAI_API_KEY) {
     console.error("REACT_APP_OPENAI_API_KEY is not set in the environment");
 }
 
-const extractFiltersFromQuery = (query: string) => {
-    const filters: {
-        keywords?: string;
-        publicationYear?: { min?: number; max?: number };
-        citationCount?: { min?: number; max?: number };
-        isOpenAccess?: boolean;
-    } = {};
+export interface Filters {
+    keywords?: string;
+    publicationYear?: { min?: number; max?: number };
+    citationCount?: { min?: number; max?: number };
+    isOpenAccess?: boolean;
+}
 
-    // Extract keywords (everything before any year or citation count)
+export const extractFiltersFromQuery = (query: string): Filters => {
+    const filters: Filters = {};
+
+    // Extract keywords
     const keywordsMatch = query.match(
         /(.*)(?=published|citations|open|year|before|after|with|more|less|than|citations|exactly|greater)/i
     );
@@ -61,28 +63,19 @@ const extractFiltersFromQuery = (query: string) => {
     }
 
     // Check if the user requested open access articles
-    if (/open\saccess/i.test(query)) {
-        filters.isOpenAccess = true;
-    }
+    filters.isOpenAccess = /open\saccess/i.test(query);
 
     return filters;
 };
 
-const buildOpenAlexApiUrl = (filters: {
-    keywords?: string;
-    publicationYear?: { min?: number; max?: number };
-    citationCount?: { min?: number; max?: number };
-    isOpenAccess?: boolean;
-}) => {
+export const buildOpenAlexApiUrl = (filters: Filters): string => {
     const baseUrl = "https://api.openalex.org/works?";
     const params: string[] = [];
 
-    // Add keyword search
     if (filters.keywords) {
         params.push(`search=${encodeURIComponent(filters.keywords)}`);
     }
 
-    // Add publication year filter
     if (filters.publicationYear) {
         if (filters.publicationYear.min && filters.publicationYear.max) {
             params.push(
@@ -95,7 +88,6 @@ const buildOpenAlexApiUrl = (filters: {
         }
     }
 
-    // Add citation count filter
     if (filters.citationCount) {
         if (filters.citationCount.min && filters.citationCount.max) {
             params.push(
@@ -108,52 +100,44 @@ const buildOpenAlexApiUrl = (filters: {
         }
     }
 
-    // Add open access filter
     if (filters.isOpenAccess) {
         params.push("is_oa:true");
     }
 
-    // Combine all params into a single API query string
-    const apiUrl = `${baseUrl}${params.join("&")}`;
-    return apiUrl;
+    return `${baseUrl}${params.join("&")}`;
 };
 
-const fetchArticles = async (apiUrl: string) => {
+export const fetchArticles = async (apiUrl: string) => {
     try {
         const response = await axios.get(apiUrl);
-        return response.data; // assuming 'results' holds the array of articles
+        return response.data;
     } catch (error) {
         console.error("Error fetching articles:", error);
-        return [];
+        return null;
     }
 };
 
-// New function to interact with OpenAI API
-const callOpenAI = async (prompt: string) => {
+export const callOpenAI = async (prompt: string) => {
     try {
-        // Truncate prompt if necessary
-        // const truncatedPrompt = truncateText(prompt, MAX_TOKENS);
-
-        // Define the messages array required by chat-based models
         const messages = [
             {
-                role: "system", // Optional system role providing context
+                role: "system",
                 content:
-                    "You are a helpful assistant that summarizes research articles. The example output: I found 5 artificial intelligence research articles published since 2015, each with exactly 100 citations.",
+                    "You are a helpful assistant that summarizes research articles.",
             },
             {
-                role: "user", // User's query
-                content: prompt, // Use truncated input
+                role: "user",
+                content: prompt,
             },
         ];
 
         const response = await axios.post(
-            "https://api.openai.com/v1/chat/completions", // Chat API endpoint
+            "https://api.openai.com/v1/chat/completions",
             {
-                model: "gpt-4o-mini", // Specify the model
-                messages: messages, // Provide the truncated messages array
-                max_tokens: 100, // Response length
-                temperature: 0.7, // Control creativity
+                model: "gpt-4o-mini",
+                messages: messages,
+                max_tokens: 100,
+                temperature: 0.7,
             },
             {
                 headers: {
@@ -163,7 +147,7 @@ const callOpenAI = async (prompt: string) => {
             }
         );
 
-        return response.data.choices[0].message.content; // Extract the assistant's reply
+        return response.data.choices[0].message.content;
     } catch (error) {
         console.error(
             "Error calling OpenAI API:",
@@ -173,9 +157,19 @@ const callOpenAI = async (prompt: string) => {
     }
 };
 
+export interface Article {
+    title: string;
+    publicationDate: string;
+    primaryTopic: string;
+    keywords: string[];
+    citationCount: number;
+    citationNormalizedPercentile: number;
+    fwci: number;
+}
+
 export interface BotResponse {
     summary: string;
-    articles: any[];
+    articles: Article[];
 }
 
 export const handleUserQuery = async (
@@ -184,7 +178,6 @@ export const handleUserQuery = async (
     try {
         const filters = extractFiltersFromQuery(query);
 
-        // Validate that we extracted at least one useful filter
         if (
             !filters.keywords &&
             !filters.publicationYear &&
@@ -195,30 +188,32 @@ export const handleUserQuery = async (
         }
 
         const apiUrl = buildOpenAlexApiUrl(filters);
-
-        // Fetch the articles from OpenAlex
         const results = await fetchArticles(apiUrl);
 
         if (!results || !results.meta || results.meta.count === 0) {
             return "No articles were found based on your search criteria. Please try adjusting your filters.";
         }
 
-        const filteredArticles = results.results.map((item) => ({
-            title: item.title,
-            publicationDate: item.publication_date,
-            primaryTopic: item.primary_topic?.display_name || "N/A",
-            keywords:
-                item.keywords?.map((keyword) => keyword.display_name) || [],
-            citationCount: item.cited_by_count,
-            citationNormalizedPercentile:
-                item.citation_normalized_percentile?.value,
-            fwci: item.fwci,
-        }));
+        const filteredArticles: Article[] = results.results.map(
+            (item: any) => ({
+                title: item.title,
+                publicationDate: item.publication_date,
+                primaryTopic: item.primary_topic?.display_name || "N/A",
+                keywords:
+                    item.keywords?.map(
+                        (keyword: any) => keyword.display_name
+                    ) || [],
+                citationCount: item.cited_by_count,
+                citationNormalizedPercentile:
+                    item.citation_normalized_percentile?.value,
+                fwci: item.fwci,
+            })
+        );
 
-        // Format the response using OpenAI
         const openAiPrompt = `Summarize the following search response metadata: ${JSON.stringify(
             results.meta
-        )}. Provide a conversational summary. The example output: I found 5 artificial intelligence research articles published since 2015, each with exactly 100 citations.
+        )}. 
+        Provide a conversational summary. The example output: I found 5 artificial intelligence research articles published since 2015, each with exactly 100 citations.
         And then, summarize the following responded articles: ${JSON.stringify(
             filteredArticles
         )}.
@@ -226,12 +221,10 @@ export const handleUserQuery = async (
 
         const openAiResponse = await callOpenAI(openAiPrompt);
 
-        // Check if openAiResponse is null or an empty string
         if (!openAiResponse) {
-            // Fallback to a basic summary if OpenAI fails
             return {
                 summary: `I found ${results.meta.count} articles related to your query about "${filters.keywords}". Here are some details about the first few:`,
-                articles: filteredArticles.slice(0, 5), // Return only the first 5 articles
+                articles: filteredArticles.slice(0, 5),
             };
         }
 
