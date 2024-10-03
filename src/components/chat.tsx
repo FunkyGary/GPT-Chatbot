@@ -16,11 +16,10 @@ import { handleUserQuery } from "../utility/apiUtility.ts"; // Import the functi
 const Chatbot = () => {
     // State to hold chat messages
     const [messages, setMessages] = useState<
-        { sender: string; text: string }[]
+        { sender: string; text: string; articles: any[] }[]
     >([]);
     const [input, setInput] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false); // State to manage loading state
-    const [articles, setArticles] = useState<any[]>([]); // State to store the fetched articles
 
     // Function to handle sending the user's query
     const handleSend = async () => {
@@ -28,7 +27,7 @@ const Chatbot = () => {
             // Add the user's message to the conversation
             setMessages((prevMessages) => [
                 ...prevMessages,
-                { sender: "User", text: input },
+                { sender: "User", text: input, articles: [] },
             ]);
 
             // Clear the input field
@@ -41,10 +40,7 @@ const Chatbot = () => {
                 // Call the handleUserQuery function to process the input and get articles and bot response
                 const botResponse = await handleUserQuery(input);
 
-                // Set articles if available
-                setArticles(botResponse.articles || []);
-
-                // Add the bot's response to the conversation
+                // Add the bot's response to the conversation, including articles
                 setMessages((prevMessages) => [
                     ...prevMessages,
                     {
@@ -52,6 +48,7 @@ const Chatbot = () => {
                         text:
                             botResponse.summary ||
                             "I couldn't find any relevant information. Can you please rephrase your question?",
+                        articles: botResponse.articles || [],
                     },
                 ]);
 
@@ -65,6 +62,7 @@ const Chatbot = () => {
                         {
                             sender: "Bot",
                             text: "I couldn't find any articles related to your query. Try asking about a different topic or rephrasing your question.",
+                            articles: [],
                         },
                     ]);
                 }
@@ -74,6 +72,7 @@ const Chatbot = () => {
                     {
                         sender: "Bot",
                         text: "An error occurred. Please try again later.",
+                        articles: [],
                     },
                 ]);
             } finally {
@@ -85,14 +84,22 @@ const Chatbot = () => {
 
     return (
         <Box
-            sx={{ width: "100%", maxWidth: 600, margin: "0 auto", padding: 2 }}
+            sx={{
+                width: "100%",
+                maxWidth: 1000,
+                margin: "0 auto",
+                padding: 2,
+                height: "95vh", // Set the container to full viewport height
+                display: "flex",
+                flexDirection: "column",
+            }}
         >
             {/* Chat window */}
             <Paper
                 elevation={3}
                 sx={{
                     padding: 2,
-                    height: 400,
+                    flexGrow: 1, // Allow the paper to grow and fill available space
                     overflowY: "auto",
                     marginBottom: 2,
                 }}
@@ -105,12 +112,59 @@ const Chatbot = () => {
                                     msg.sender === "User" ? "You" : "Chatbot"
                                 }
                                 secondary={
-                                    <Typography
-                                        component="span"
-                                        variant="body2"
-                                    >
-                                        {msg.text}
-                                    </Typography>
+                                    <>
+                                        <Typography
+                                            component="span"
+                                            variant="body2"
+                                        >
+                                            {msg.text}
+                                        </Typography>
+                                        {msg.articles &&
+                                            msg.articles.length > 0 && (
+                                                <Box sx={{ marginTop: 1 }}>
+                                                    {msg.articles.map(
+                                                        (
+                                                            article,
+                                                            articleIndex
+                                                        ) => (
+                                                            <Card
+                                                                key={
+                                                                    articleIndex
+                                                                }
+                                                                sx={{
+                                                                    marginBottom: 1,
+                                                                }}
+                                                            >
+                                                                <CardContent>
+                                                                    <Typography variant="subtitle2">
+                                                                        {
+                                                                            article.title
+                                                                        }
+                                                                    </Typography>
+                                                                    <Typography variant="caption">
+                                                                        Published
+                                                                        in:{" "}
+                                                                        {
+                                                                            article.publication_year
+                                                                        }{" "}
+                                                                        |
+                                                                        Citations:{" "}
+                                                                        {
+                                                                            article.cited_by_count
+                                                                        }{" "}
+                                                                        | Open
+                                                                        Access:{" "}
+                                                                        {article.is_oa
+                                                                            ? "Yes"
+                                                                            : "No"}
+                                                                    </Typography>
+                                                                </CardContent>
+                                                            </Card>
+                                                        )
+                                                    )}
+                                                </Box>
+                                            )}
+                                    </>
                                 }
                             />
                         </ListItem>
@@ -139,30 +193,6 @@ const Chatbot = () => {
             >
                 {loading ? "Processing..." : "Send"}
             </Button>
-
-            {/* Article Cards */}
-            {articles.length > 0 && (
-                <Box sx={{ marginTop: 2 }}>
-                    {articles.map((article, index) => (
-                        <Card key={index} sx={{ marginBottom: 2 }}>
-                            <CardContent>
-                                <Typography variant="h6">
-                                    {article.title}
-                                </Typography>
-                                <Typography variant="body2">
-                                    Published in: {article.publication_year}
-                                </Typography>
-                                <Typography variant="body2">
-                                    Citations: {article.cited_by_count}
-                                </Typography>
-                                <Typography variant="body2">
-                                    Open Access: {article.is_oa ? "Yes" : "No"}
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </Box>
-            )}
         </Box>
     );
 };

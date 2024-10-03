@@ -17,7 +17,7 @@ const extractFiltersFromQuery = (query: string) => {
     const keywordsMatch = query.match(
         /(.*)(?=published|citations|open|year|before|after|with|more|less|than|citations|exactly|greater)/i
     );
-    filters.keywords = keywordsMatch ? keywordsMatch[1].trim() : "";
+    filters.keywords = keywordsMatch ? keywordsMatch[1].trim() : query.trim();
 
     // Extract publication year
     const yearMatch = query.match(
@@ -74,53 +74,47 @@ const buildOpenAlexApiUrl = (filters: {
     citationCount?: { min?: number; max?: number };
     isOpenAccess?: boolean;
 }) => {
-    const baseUrl = "https://api.openalex.org/works?filter=";
-    const filterParams: string[] = [];
+    const baseUrl = "https://api.openalex.org/works?";
+    const params: string[] = [];
 
     // Add keyword search
     if (filters.keywords) {
-        filterParams.push(
-            `default.search:${encodeURIComponent(filters.keywords)}`
-        );
+        params.push(`search=${encodeURIComponent(filters.keywords)}`);
     }
 
     // Add publication year filter
     if (filters.publicationYear) {
         if (filters.publicationYear.min && filters.publicationYear.max) {
-            filterParams.push(
+            params.push(
                 `publication_year:${filters.publicationYear.min}-${filters.publicationYear.max}`
             );
         } else if (filters.publicationYear.min) {
-            filterParams.push(
-                `publication_year:>${filters.publicationYear.min}`
-            );
+            params.push(`publication_year:>${filters.publicationYear.min}`);
         } else if (filters.publicationYear.max) {
-            filterParams.push(
-                `publication_year:<${filters.publicationYear.max}`
-            );
+            params.push(`publication_year:<${filters.publicationYear.max}`);
         }
     }
 
     // Add citation count filter
     if (filters.citationCount) {
         if (filters.citationCount.min && filters.citationCount.max) {
-            filterParams.push(
+            params.push(
                 `cited_by_count:${filters.citationCount.min}-${filters.citationCount.max}`
             );
         } else if (filters.citationCount.min) {
-            filterParams.push(`cited_by_count:>${filters.citationCount.min}`);
+            params.push(`cited_by_count:>${filters.citationCount.min}`);
         } else if (filters.citationCount.max) {
-            filterParams.push(`cited_by_count:<${filters.citationCount.max}`);
+            params.push(`cited_by_count:<${filters.citationCount.max}`);
         }
     }
 
     // Add open access filter
     if (filters.isOpenAccess) {
-        filterParams.push("is_oa:true");
+        params.push("is_oa:true");
     }
 
-    // Combine all filters into a single API query string
-    const apiUrl = `${baseUrl}${filterParams.join(",")}`;
+    // Combine all params into a single API query string
+    const apiUrl = `${baseUrl}${params.join("&")}`;
     return apiUrl;
 };
 
@@ -180,54 +174,66 @@ const callOpenAI = async (prompt: string) => {
 };
 
 export const handleUserQuery = async (query: string) => {
-    const filters = extractFiltersFromQuery(query);
+    try {
+        const filters = extractFiltersFromQuery(query);
 
-    // Validate that we extracted at least one useful filter
-    if (
-        !filters.keywords &&
-        !filters.publicationYear &&
-        !filters.citationCount
-    ) {
-        return "Sorry, I couldn't understand your query. Please try again with specific keywords, year, or citation count.";
-    }
+        // Validate that we extracted at least one useful filter
+        if (
+            !filters.keywords &&
+            !filters.publicationYear &&
+            !filters.citationCount &&
+            !filters.isOpenAccess
+        ) {
+            return "Sorry, I couldn't understand your query. Please try again with specific keywords, year, citation count, or open access filter.";
+        }
 
-    const apiUrl = buildOpenAlexApiUrl(filters);
+        const apiUrl = buildOpenAlexApiUrl(filters);
 
-    // Fetch the articles from OpenAlex
-    const results = await fetchArticles(apiUrl);
+        // Fetch the articles from OpenAlex
+        const results = await fetchArticles(apiUrl);
 
-    if (results.meta.count === 0) {
-        return "No articles were found based on your search criteria. Please try adjusting your filters.";
-    }
+        if (!results || !results.meta || results.meta.count === 0) {
+            return "No articles were found based on your search criteria. Please try adjusting your filters.";
+        }
 
-    const filteredArticles = results.results.map((item) => {
-        return {
+        const filteredArticles = results.results.map((item) => ({
             title: item.title,
             publicationDate: item.publication_date,
-            primaryTopic: item.primary_topic.display_name,
-            keywords: item.keywords.map((keyword) => keyword.display_name),
+            primaryTopic: item.primary_topic?.display_name || "N/A",
+            keywords:
+                item.keywords?.map((keyword) => keyword.display_name) || [],
             citationCount: item.cited_by_count,
             citationNormalizedPercentile:
-                item.citation_normalized_percentile.value,
+                item.citation_normalized_percentile?.value,
             fwci: item.fwci,
+        }));
+
+        // Format the response using OpenAI
+        const openAiPrompt = `Summarize the following search response metadata: ${JSON.stringify(
+            results.meta
+        )}. Provide a conversational summary. The example output: I found 5 artificial intelligence research articles published since 2015, each with exactly 100 citations.
+        And then, summarize the following responded articles: ${JSON.stringify(
+            filteredArticles
+        )}.
+        Provide a conversational summary. The example output: These papers span diverse AI applications including healthcare, climate change, ethics, natural language processing, and finance. Published between 2015 and 2021, with 3 being open access, they represent influential work across various AI domains in recent years.`;
+
+        const openAiResponse = await callOpenAI(openAiPrompt);
+
+        // Check if openAiResponse is null or an empty string
+        if (!openAiResponse) {
+            // Fallback to a basic summary if OpenAI fails
+            return {
+                summary: `I found ${results.meta.count} articles related to your query about "${filters.keywords}". Here are some details about the first few:`,
+                articles: filteredArticles.slice(0, 5), // Return only the first 5 articles
+            };
+        }
+
+        return {
+            summary: openAiResponse,
+            articles: filteredArticles,
         };
-    });
-
-    // Format the response using OpenAI
-    const openAiPrompt = `Summarize the following search response metadata: ${JSON.stringify(
-        results.meta
-    )}. Provide a conversational summary. The example output: I found 5 artificial intelligence research articles published since 2015, each with exactly 100 citations.
-    And then, summarize the following responsed articles: ${JSON.stringify(
-        filteredArticles
-    )}.
-    Provide a conversational summary. The example output: These papers span diverse AI applications including healthcare, climate change, ethics, natural language processing, and finance. Published between 2015 and 2021, with 3 being open access, they represent influential work across various AI domains in recent years.`;
-
-    const openAiResponse = await callOpenAI(openAiPrompt);
-
-    return {
-        summary:
-            openAiResponse ||
-            `I found ${results.meta.count} articles related to your query. Here's the first one: ${results.results[0].title}`,
-        articles: filteredArticles,
-    };
+    } catch (error) {
+        console.error("Error in handleUserQuery:", error);
+        return "An error occurred while processing your query. Please try again later.";
+    }
 };
