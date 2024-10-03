@@ -42,3 +42,5 @@ This project is an AI-powered chatbot that helps users find and summarize resear
 ### Running the Application
 
 To start the development server:
+docker build --build-arg REACT_APP_OPENAI_API_KEY=your-api-key-here -t your-image-name .
+docker build --build-arg REACT_APP_OPENAI_API_KEY=$(cat .env | grep REACT_APP_OPENAI_API_KEY | cut -d '=' -f2) -t your-image-name .
