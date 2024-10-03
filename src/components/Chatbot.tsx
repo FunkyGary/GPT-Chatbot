@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Box } from "@mui/material";
-import { handleUserQuery, BotResponse } from "../utility/apiUtility.ts";
+import { handleUserQuery } from "../utility/apiUtility.ts";
 import ChatWindow from "./ChatWindow.tsx";
 import InputArea from "./InputArea.tsx";
 
@@ -27,7 +27,7 @@ const Chatbot: React.FC = () => {
             setLoading(true);
 
             try {
-                const botResponse: BotResponse = await handleUserQuery(input);
+                const botResponse = await handleUserQuery(input);
 
                 setMessages((prevMessages) => {
                     const updatedMessages = [...prevMessages];
@@ -49,18 +49,6 @@ const Chatbot: React.FC = () => {
                                 articles: botResponse.articles || [],
                                 isLoading: false,
                             });
-
-                            if (
-                                !botResponse.articles ||
-                                botResponse.articles.length === 0
-                            ) {
-                                updatedMessages.push({
-                                    sender: "Bot",
-                                    text: "I couldn't find any articles related to your query. Try asking about a different topic or rephrasing your question.",
-                                    articles: [],
-                                    isLoading: false,
-                                });
-                            }
                         }
                     }
                     return updatedMessages;
